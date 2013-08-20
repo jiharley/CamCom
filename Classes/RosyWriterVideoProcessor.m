@@ -57,7 +57,7 @@
 #define SFDJustBegin 2
 #define DataDidBegin 3
 #define BYTES_PER_PIXEL 4
-#define SamplePixelNumbers 40
+#define SamplePixelNumbers 24
 
 #define START_ROW 190
 #define END_ROW 350
@@ -66,8 +66,9 @@
 
 #define MIDDLE_ROW 270
 #define MIDDLE_COLUMN 480
-#define SampleLineLength 40
-#define HalfSampleLineLength 20
+#define SampleLineLength 240
+#define HalfSampleLineLength 120
+
 #define HALF_SQUARE_LENGTH 60
 #define SQUARE_LENGTH 120
 
@@ -112,24 +113,16 @@ typedef struct samplePixelArray {
         lastState = DataDidBegin;
         startStateMachine = false;
         cntDataFrame = 0;
+        cntTraining = 0;
         dataFrameBuffer = [[NSMutableArray alloc] init];
+        trainingPixelValue = 0;
+        trainingFinished = false;
 //        demodulate_queue = dispatch_queue_create("demodulate_queue", nil);
-        
-//        for (int i=0; i<32; i++) {
-//            bitFrame[i]=0;
-//        }
-        
+                
         // The temporary path for the video before saving it to the photo album
         movieURL = [NSURL fileURLWithPath:[NSString stringWithFormat:@"%@%@", NSTemporaryDirectory(), @"Movie.MOV"]];
         [movieURL retain];
     }
-//    for (int i=0; i<2; i++) {
-//        for (int j =0; j<240; j++) {
-//            for (int k=0; k<3; k++) {
-//                samplePixelArray[i][j][k] = 0;
-//            }
-//        }
-//    }
     return self;
 }
 
@@ -416,6 +409,22 @@ typedef struct samplePixelArray {
 //	int bufferHeight = CVPixelBufferGetHeight(pixelBuffer);
 	unsigned char *pixel = (unsigned char *)CVPixelBufferGetBaseAddress(pixelBuffer);
     
+    //three sample lines
+    for (int row = MIDDLE_ROW - HalfSampleLineLength; row<MIDDLE_ROW+HalfSampleLineLength; row++) {
+        for (int column = MIDDLE_COLUMN -2; column < MIDDLE_COLUMN; column++) {
+            unsigned char *tmpPixel  = row * bufferWidth * BYTES_PER_PIXEL + column *BYTES_PER_PIXEL + pixel;
+            tmpPixel[0] = tmpPixel[1] = tmpPixel[2] = 255;
+        }
+        for (int column = MIDDLE_COLUMN -42; column < MIDDLE_COLUMN-40; column++) {
+                unsigned char *tmpPixel  = row * bufferWidth * BYTES_PER_PIXEL + column *BYTES_PER_PIXEL + pixel;
+                tmpPixel[0] = tmpPixel[1] = tmpPixel[2] = 255;
+        }  
+        for (int column = MIDDLE_COLUMN +38; column < MIDDLE_COLUMN+40; column++) {
+            unsigned char *tmpPixel  = row * bufferWidth * BYTES_PER_PIXEL + column *BYTES_PER_PIXEL + pixel;
+            tmpPixel[0] = tmpPixel[1] = tmpPixel[2] = 255;
+        }
+    }
+/*
     //sceneview window horizontal border line
     for (int row = START_ROW - 2; row < START_ROW; row++) {
         for (int column = START_COLUMN - 2; column < END_COLUMN + 2; column ++) {
@@ -449,51 +458,85 @@ typedef struct samplePixelArray {
             thisPixel[2]=255;thisPixel[0]=thisPixel[1]=0;
         }
     }
-    
+*/    
     //sceneview window
-    if (startingDemodulate) {
-//        SamplePixelArray brightness1,brightness2;
-//        for (int i=0; i<SamplePixelNumbers; i++) {
-//            brightness1.array[i] = 5;
-//            brightness2.array[i] = 51;
-//        }
-//        [dataFrameBuffer addObject:[NSValue value:&brightness1 withObjCType:@encode(SamplePixelArray)]];
-//        [dataFrameBuffer addObject:[NSValue value:&brightness2 withObjCType:@encode(SamplePixelArray)]];
-//        SamplePixelArray brightness3,brightness4;
-//        [[dataFrameBuffer objectAtIndex:0] getValue:&brightness3];
-//        [[dataFrameBuffer objectAtIndex:1] getValue:&brightness4];
-        
-//        unsigned short brightness[SamplePixelNumbers];
-        SamplePixelArray brightness;
+    if (startingDemodulate)
+    {
+        SamplePixelArray pixelArr;
         int sampleCnt = 0;
-        int toggleCnt = 0;
-//        int cntSFDBrightness = 0;
-        for (int row = MIDDLE_ROW-HalfSampleLineLength; row < MIDDLE_ROW+HalfSampleLineLength; row=row+1) {
-            unsigned char *thisPixel = row * bufferWidth * BYTES_PER_PIXEL + bufferWidth/2 * BYTES_PER_PIXEL + pixel;
-            brightness.array[sampleCnt] = (short) (3 * thisPixel[2] + 6 * thisPixel[1] + 1 * thisPixel[0])/10;
-            if (sampleCnt >= 1) {
-                if (abs(brightness.array[sampleCnt] - brightness.array[sampleCnt-1]) >= 128) {
-                    toggleCnt++;
-                }
-            }
-//            if (brightness[sampleCnt] >= 90 && brightness[sampleCnt] <= 220) {
-//                cntSFDBrightness++;
-//            }
+        for (int row = MIDDLE_ROW-HalfSampleLineLength; row < MIDDLE_ROW+HalfSampleLineLength; row=row+10) {
+            unsigned char *thisPixel = row * bufferWidth * BYTES_PER_PIXEL + MIDDLE_COLUMN * BYTES_PER_PIXEL + pixel;
+//            brightness.array[sampleCnt] = (short) (3 * thisPixel[2] + 6 * thisPixel[1] + 1 * thisPixel[0])/10;
+            pixelArr.array[sampleCnt] = thisPixel[2];
             sampleCnt++;
         }
-        if (toggleCnt >= 4) {
-            startStateMachine = true;
-            thisFrame = SFD;
-        } else {
-            thisFrame = DATA;
+        //ascend sort the sampled array
+        int sortArr[SamplePixelNumbers];
+        for (int i = 0; i<SamplePixelNumbers; i++) {
+            sortArr[i] = pixelArr.array[i];
         }
+        int k,temp;
+        for (int i = 0; i<SamplePixelNumbers - 1; i++) {
+            k=i;
+            for (int j=i+1; j<SamplePixelNumbers; j++) {
+                if (sortArr[k]>sortArr[j]){
+                    k=j;
+                }
+            }
+            if (i != k) {
+                temp=sortArr[i];
+                sortArr[i]=sortArr[k];
+                sortArr[k]=temp;
+            }
+        }
+        int averMin = (sortArr[0]+sortArr[1]+sortArr[2])/3;
+        //before demodulating, training to get the average pixel value of dark
+        if (!trainingFinished) {
+            if (cntTraining < 10) {
+                if (cntTraining == 0) {
+                    trainingPixelValue = averMin;
+                }
+                else {
+                    if (trainingPixelValue - averMin > 20) {
+                        trainingPixelValue = averMin;
+                    }
+                    else if (averMin > trainingPixelValue && averMin-trainingPixelValue<20) {
+                        trainingPixelValue = averMin;
+                    }
+                }
+                cntTraining++;
+            }
+            else {
+                trainingPixelValue = trainingPixelValue + 10;
+                trainingFinished = true;
+                NSLog(@"training value: %d", trainingPixelValue);
+            }
+        }
+        else {
+            if (averMin > trainingPixelValue) {
+                thisFrame = SFD;
+//                NSLog(@"SFD");
+                startStateMachine = true;
+            }
+            else {
+                thisFrame = DATA;
+            }
+        }
+        
+//        if (darkCnt <= 2) {
+//            NSLog(@"SFD");
+////            startStateMachine = true;
+//            thisFrame = SFD;
+//        } else {
+//            thisFrame = DATA;
+//        }
         if (startStateMachine) {
             short state = 2*lastFrame + 1*thisFrame;
             switch (lastState) {
                 case SFDJustBegin:
                     if (thisFrame == SFD) {
                         cntDataFrame = 0;
-                        NSLog(@"SFD2;%d", toggleCnt);
+                        NSLog(@"SFD2;%d", averMin);
                     }
                     else {
                         [self resetState];
@@ -503,7 +546,7 @@ typedef struct samplePixelArray {
                 case SFDWillEnd:
                     if (thisFrame == DATA) {
                         cntDataFrame++;
-                        [dataFrameBuffer addObject:[NSValue value:&brightness withObjCType:@encode(SamplePixelArray)]];
+                        [dataFrameBuffer addObject:[NSValue value:&pixelArr withObjCType:@encode(SamplePixelArray)]];
                     }
                     else {
                         NSLog(@"error 1: more than 2 SFD");
@@ -513,7 +556,7 @@ typedef struct samplePixelArray {
                 case DataJustBegin:
                     if (thisFrame == DATA) {
                         cntDataFrame++;
-                        [dataFrameBuffer addObject:[NSValue value:&brightness withObjCType:@encode(SamplePixelArray)]];
+                        [dataFrameBuffer addObject:[NSValue value:&pixelArr withObjCType:@encode(SamplePixelArray)]];
                     }
                     else {
                         NSLog(@"error 2: only one frame of data");
@@ -523,7 +566,7 @@ typedef struct samplePixelArray {
                 case DataDidBegin:
                     if (thisFrame == DATA) {
                         cntDataFrame++;
-                        [dataFrameBuffer addObject:[NSValue value:&brightness withObjCType:@encode(SamplePixelArray)]];
+                        [dataFrameBuffer addObject:[NSValue value:&pixelArr withObjCType:@encode(SamplePixelArray)]];
                     }
                     else {
                         if (cntDataFrame%2==0) {
@@ -538,7 +581,7 @@ typedef struct samplePixelArray {
                             else {
                                 NSLog(@"reset from error");
                             }
-                            NSLog(@"SFD1;%d", toggleCnt);
+                            NSLog(@"SFD1;%d", averMin);
                         }
                         else {
                             NSLog(@"error 3: data frame numbers is odd, can't demodulate");
@@ -554,12 +597,14 @@ typedef struct samplePixelArray {
                 lastFrame = thisFrame;
             }
         }
-        NSString *logStr = [[[NSString alloc] init] autorelease];
-        for (int i=0; i<SamplePixelNumbers; i++) {
-            logStr = [logStr stringByAppendingString:[NSString stringWithFormat:@"%d,",brightness.array[i]]];
-        }
-        NSLog(@"%@", logStr);
-//        NSLog(@"%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,", brightness[0],brightness[1],brightness[2],brightness[3],brightness[4],brightness[5],brightness[6],brightness[7],brightness[8],brightness[9],brightness[10],brightness[11],brightness[12],brightness[13],brightness[14]);
+//        NSString *logStr = [[[NSString alloc] init] autorelease];
+//        NSString *sortStr = [[[NSString alloc] init] autorelease];
+//        for (int i=0; i<SamplePixelNumbers; i++) {
+//            logStr = [logStr stringByAppendingString:[NSString stringWithFormat:@"%d,",pixelArr.array[i]]];
+//            sortStr = [sortStr stringByAppendingString:[NSString stringWithFormat:@"%d,",sortArr[i]]];
+//        }
+//        NSLog(@"%@", sortStr);
+//        NSLog(@"%@", logStr);
     }
     
 	CVPixelBufferUnlockBaseAddress( pixelBuffer, 0 );
@@ -589,12 +634,15 @@ typedef struct samplePixelArray {
         else {
             [[dataFrameBuffer objectAtIndex:i] getValue:&secondArr];
             int difference[SamplePixelNumbers];
-            int sumDiff = 0;
+            int cntDiff = 0;
             for (int j=0; j<SamplePixelNumbers; j++) {
                 difference[j] = abs(firstArr.array[j] - secondArr.array[j]);
-                sumDiff += difference[j];
+                if (difference[j] < 20) {
+                    cntDiff++;
+                }
             }
-            if (sumDiff/SamplePixelNumbers > 150) {
+//            NSLog(@"same: %d", cntDiff);
+            if (cntDiff < 12) {
 //                NSLog(@"%d",1);
                 data[(i-1)/2] = 1;
             }

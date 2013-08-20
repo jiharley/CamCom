@@ -91,6 +91,9 @@
     int samplePixelArray[2][16];
     unsigned short bitFrame[32];
     short lastState;
+    int cntTraining;
+    int trainingPixelValue;
+    bool trainingFinished;
 	// Only accessed on movie writing queue
     BOOL readyToRecordAudio; 
     BOOL readyToRecordVideo;
