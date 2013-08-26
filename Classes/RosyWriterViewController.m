@@ -121,6 +121,12 @@ static inline double radians (double degrees) { return degrees * (M_PI / 180); }
  	}
 }
 
+- (void)updateDataLabel
+{
+    showBinDataLabel.text = [videoProcessor receivedData_bin];
+    showDecDataLabel.text = [videoProcessor receivedData_dec];
+}
+
 - (UILabel *)labelWithText:(NSString *)text yPosition:(CGFloat)yPosition
 {
 	CGFloat labelWidth = 200.0;
@@ -201,6 +207,24 @@ static inline double radians (double degrees) { return degrees * (M_PI / 180); }
     [shouldEnableTapFocusBtn addTarget:self action:@selector(enableOrDisableTapFocus:) forControlEvents:UIControlEventTouchUpInside];
     
     [previewView addSubview:shouldEnableTapFocusBtn];
+    
+    showBinDataLabel = [[[UILabel alloc] initWithFrame:CGRectMake(10, 100, 500, 50)] autorelease];
+    [showBinDataLabel setTextColor:[UIColor whiteColor]];
+    [showBinDataLabel setBackgroundColor:[UIColor colorWithRed:0.0 green:0.0 blue:0.0 alpha:0.25]];
+    [showBinDataLabel setFont:[UIFont systemFontOfSize:48]];
+    [showBinDataLabel setText:@"88888888"];
+    showBinDataLabel.adjustsFontSizeToFitWidth = YES;
+    
+    [previewView addSubview:showBinDataLabel];
+    
+    showDecDataLabel = [[[UILabel alloc] initWithFrame:CGRectMake(10, 160, 250, 50)] autorelease];
+    [showDecDataLabel setTextColor:[UIColor whiteColor]];
+    [showDecDataLabel setBackgroundColor:[UIColor colorWithRed:0.0 green:0.0 blue:0.0 alpha:0.25]];
+    [showDecDataLabel setFont:[UIFont systemFontOfSize:52]];
+    [showDecDataLabel setText:@"88888888"];
+    showDecDataLabel.adjustsFontSizeToFitWidth = YES;
+    
+    [previewView addSubview:showDecDataLabel];
 }
 
 - (void)cleanup
@@ -212,6 +236,8 @@ static inline double radians (double degrees) { return degrees * (M_PI / 180); }
     dimensionsLabel = nil;
     typeLabel = nil;
     shouldEnableTapFocusBtn = nil;
+    showBinDataLabel = nil;
+    showDecDataLabel = nil;
     
     NSNotificationCenter *notificationCenter = [NSNotificationCenter defaultCenter];
 	[notificationCenter removeObserver:self name:UIDeviceOrientationDidChangeNotification object:nil];
@@ -237,6 +263,7 @@ static inline double radians (double degrees) { return degrees * (M_PI / 180); }
 	[super viewWillAppear:animated];
 
 	timer = [NSTimer scheduledTimerWithTimeInterval:0.25 target:self selector:@selector(updateLabels) userInfo:nil repeats:YES];
+    showDataTimer = [NSTimer scheduledTimerWithTimeInterval:0.1 target:self selector:@selector(updateDataLabel) userInfo:nil repeats:YES];
 }
 
 - (void)viewDidDisappear:(BOOL)animated
@@ -244,7 +271,9 @@ static inline double radians (double degrees) { return degrees * (M_PI / 180); }
 	[super viewDidDisappear:animated];
 
 	[timer invalidate];
+    [showDataTimer invalidate];
 	timer = nil;
+    showDataTimer = nil;
 }
 
 - (void)dealloc 

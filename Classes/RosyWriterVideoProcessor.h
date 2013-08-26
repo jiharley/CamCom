@@ -92,8 +92,13 @@
     unsigned short bitFrame[32];
     short lastState;
     int cntTraining;
-    int trainingPixelValue;
+    int trainingPixelValue1;
+    int trainingPixelValue2;
+    int trainingPixelValue3;
     bool trainingFinished;
+    
+    NSString *receivedData_bin;
+    NSString *receivedData_dec;
 	// Only accessed on movie writing queue
     BOOL readyToRecordAudio; 
     BOOL readyToRecordVideo;
@@ -108,6 +113,8 @@
 @property (readonly) Float64 videoFrameRate;
 @property (readonly) CMVideoDimensions videoDimensions;
 @property (readonly) CMVideoCodecType videoType;
+@property (readonly) NSString *receivedData_bin;
+@property (readonly) NSString *receivedData_dec;
 
 @property (readwrite) AVCaptureVideoOrientation referenceOrientation;
 

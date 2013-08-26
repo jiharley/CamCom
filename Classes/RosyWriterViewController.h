@@ -59,11 +59,14 @@
 	UILabel *frameRateLabel;
 	UILabel *dimensionsLabel;
 	UILabel *typeLabel;
- 
+    UILabel *showBinDataLabel;
+    UILabel *showDecDataLabel;
+    
     UIButton *shouldEnableTapFocusBtn;
     BOOL shouldEnableTapFocus;
     
     NSTimer *timer;
+    NSTimer *showDataTimer;
     
 	BOOL shouldShowStats;
 	

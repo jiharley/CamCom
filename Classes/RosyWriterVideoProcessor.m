@@ -57,7 +57,7 @@
 #define SFDJustBegin 2
 #define DataDidBegin 3
 #define BYTES_PER_PIXEL 4
-#define SamplePixelNumbers 24
+#define SamplePixelNumbers 20
 
 #define START_ROW 190
 #define END_ROW 350
@@ -66,8 +66,8 @@
 
 #define MIDDLE_ROW 270
 #define MIDDLE_COLUMN 480
-#define SampleLineLength 240
-#define HalfSampleLineLength 120
+#define SampleLineLength 200
+#define HalfSampleLineLength 100
 
 #define HALF_SQUARE_LENGTH 60
 #define SQUARE_LENGTH 120
@@ -80,7 +80,9 @@ typedef struct columnPixel {
     int array[3][240];
 }ColumnPixel;
 typedef struct samplePixelArray {
-    int array[SamplePixelNumbers];
+    int array1[SamplePixelNumbers];
+    int array2[SamplePixelNumbers];
+    int array3[SamplePixelNumbers];
 }SamplePixelArray;
 @interface RosyWriterVideoProcessor ()
 
@@ -102,6 +104,7 @@ typedef struct samplePixelArray {
 @synthesize referenceOrientation;
 @synthesize videoOrientation;
 @synthesize recording;
+@synthesize receivedData_bin, receivedData_dec;
 
 - (id) init
 {
@@ -115,10 +118,13 @@ typedef struct samplePixelArray {
         cntDataFrame = 0;
         cntTraining = 0;
         dataFrameBuffer = [[NSMutableArray alloc] init];
-        trainingPixelValue = 0;
+        trainingPixelValue1 = 0;
+        trainingPixelValue2 = 0;
+        trainingPixelValue3 = 0;
         trainingFinished = false;
 //        demodulate_queue = dispatch_queue_create("demodulate_queue", nil);
-                
+        receivedData_bin = [[NSString alloc] initWithString:@"88888888"];
+        receivedData_dec = [[NSString alloc] initWithString:@"88888888"];
         // The temporary path for the video before saving it to the photo album
         movieURL = [NSURL fileURLWithPath:[NSString stringWithFormat:@"%@%@", NSTemporaryDirectory(), @"Movie.MOV"]];
         [movieURL retain];
@@ -136,6 +142,9 @@ typedef struct samplePixelArray {
         demodulate_queue = NULL;
     }
     [dataFrameBuffer release];
+    [receivedData_bin release];
+    [receivedData_dec release];
+    
 	[super dealloc];
 }
 
@@ -411,16 +420,16 @@ typedef struct samplePixelArray {
     
     //three sample lines
     for (int row = MIDDLE_ROW - HalfSampleLineLength; row<MIDDLE_ROW+HalfSampleLineLength; row++) {
+        for (int column = MIDDLE_COLUMN -42; column < MIDDLE_COLUMN-40; column++) {
+            unsigned char *tmpPixel  = (row-40) * bufferWidth * BYTES_PER_PIXEL + column *BYTES_PER_PIXEL + pixel;
+            tmpPixel[0] = tmpPixel[1] = tmpPixel[2] = 255;
+        }
         for (int column = MIDDLE_COLUMN -2; column < MIDDLE_COLUMN; column++) {
             unsigned char *tmpPixel  = row * bufferWidth * BYTES_PER_PIXEL + column *BYTES_PER_PIXEL + pixel;
             tmpPixel[0] = tmpPixel[1] = tmpPixel[2] = 255;
         }
-        for (int column = MIDDLE_COLUMN -42; column < MIDDLE_COLUMN-40; column++) {
-                unsigned char *tmpPixel  = row * bufferWidth * BYTES_PER_PIXEL + column *BYTES_PER_PIXEL + pixel;
-                tmpPixel[0] = tmpPixel[1] = tmpPixel[2] = 255;
-        }  
         for (int column = MIDDLE_COLUMN +38; column < MIDDLE_COLUMN+40; column++) {
-            unsigned char *tmpPixel  = row * bufferWidth * BYTES_PER_PIXEL + column *BYTES_PER_PIXEL + pixel;
+            unsigned char *tmpPixel  = (row+40) * bufferWidth * BYTES_PER_PIXEL + column *BYTES_PER_PIXEL + pixel;
             tmpPixel[0] = tmpPixel[1] = tmpPixel[2] = 255;
         }
     }
@@ -465,55 +474,102 @@ typedef struct samplePixelArray {
         SamplePixelArray pixelArr;
         int sampleCnt = 0;
         for (int row = MIDDLE_ROW-HalfSampleLineLength; row < MIDDLE_ROW+HalfSampleLineLength; row=row+10) {
-            unsigned char *thisPixel = row * bufferWidth * BYTES_PER_PIXEL + MIDDLE_COLUMN * BYTES_PER_PIXEL + pixel;
+            unsigned char *thisPixel1 = (row-40) * bufferWidth * BYTES_PER_PIXEL + (MIDDLE_COLUMN-40) * BYTES_PER_PIXEL + pixel;
+            unsigned char *thisPixel2 = row * bufferWidth * BYTES_PER_PIXEL + MIDDLE_COLUMN * BYTES_PER_PIXEL + pixel;
+            unsigned char *thisPixel3 = (row+40) * bufferWidth * BYTES_PER_PIXEL + (MIDDLE_COLUMN+40) * BYTES_PER_PIXEL + pixel;
 //            brightness.array[sampleCnt] = (short) (3 * thisPixel[2] + 6 * thisPixel[1] + 1 * thisPixel[0])/10;
-            pixelArr.array[sampleCnt] = thisPixel[2];
+            pixelArr.array1[sampleCnt] = thisPixel1[2];
+            pixelArr.array2[sampleCnt] = thisPixel2[2];
+            pixelArr.array3[sampleCnt] = thisPixel3[2];
             sampleCnt++;
         }
         //ascend sort the sampled array
-        int sortArr[SamplePixelNumbers];
+        SamplePixelArray sortArr;
         for (int i = 0; i<SamplePixelNumbers; i++) {
-            sortArr[i] = pixelArr.array[i];
+            sortArr.array1[i] = pixelArr.array1[i];
+            sortArr.array2[i] = pixelArr.array2[i];
+            sortArr.array3[i] = pixelArr.array3[i];
         }
-        int k,temp;
+        int k1,k2,k3,temp1,temp2,temp3;
         for (int i = 0; i<SamplePixelNumbers - 1; i++) {
-            k=i;
+            k1=i;k2=i;k3=i;
             for (int j=i+1; j<SamplePixelNumbers; j++) {
-                if (sortArr[k]>sortArr[j]){
-                    k=j;
+                if (sortArr.array1[k1]>sortArr.array1[j]){
+                    k1=j;
+                }
+                if (sortArr.array2[k2]>sortArr.array2[j]){
+                    k2=j;
+                }
+                if (sortArr.array3[k3]>sortArr.array3[j]){
+                    k3=j;
                 }
             }
-            if (i != k) {
-                temp=sortArr[i];
-                sortArr[i]=sortArr[k];
-                sortArr[k]=temp;
+            if (i != k1) {
+                temp1=sortArr.array1[i];
+                sortArr.array1[i]=sortArr.array1[k1];
+                sortArr.array1[k1]=temp1;
+            }
+            if (i != k2) {
+                temp2=sortArr.array2[i];
+                sortArr.array2[i]=sortArr.array2[k2];
+                sortArr.array2[k2]=temp2;
+            }
+            if (i != k3) {
+                temp3=sortArr.array3[i];
+                sortArr.array3[i]=sortArr.array3[k3];
+                sortArr.array3[k3]=temp3;
             }
         }
-        int averMin = (sortArr[0]+sortArr[1]+sortArr[2])/3;
+        int averMin1 = (sortArr.array1[0]+sortArr.array1[1]+sortArr.array1[2])/3;
+        int averMin2 = (sortArr.array2[0]+sortArr.array2[1]+sortArr.array2[2])/3;
+        int averMin3 = (sortArr.array3[0]+sortArr.array3[1]+sortArr.array3[2])/3;
         //before demodulating, training to get the average pixel value of dark
         if (!trainingFinished) {
             if (cntTraining < 10) {
                 if (cntTraining == 0) {
-                    trainingPixelValue = averMin;
+                    trainingPixelValue1 = averMin1;
+                    trainingPixelValue2 = averMin2;
+                    trainingPixelValue3 = averMin3;
                 }
                 else {
-                    if (trainingPixelValue - averMin > 20) {
-                        trainingPixelValue = averMin;
+                    //first line
+                    if (trainingPixelValue1 - averMin1 > 20) {
+                        trainingPixelValue1 = averMin1;
                     }
-                    else if (averMin > trainingPixelValue && averMin-trainingPixelValue<20) {
-                        trainingPixelValue = averMin;
+                    else if (averMin1 > trainingPixelValue1 && averMin1-trainingPixelValue1 < 20) {
+                        trainingPixelValue1 = averMin1;
+                    }
+                    //sencond line
+                    if (trainingPixelValue2 - averMin2 > 20) {
+                        trainingPixelValue2 = averMin2;
+                    }
+                    else if (averMin2 > trainingPixelValue2 && averMin2-trainingPixelValue2 < 20) {
+                        trainingPixelValue2 = averMin2;
+                    }
+                    //third line
+                    if (trainingPixelValue3 - averMin3 > 20) {
+                        trainingPixelValue3 = averMin3;
+                    }
+                    else if (averMin3 > trainingPixelValue3 && averMin3-trainingPixelValue3 < 20) {
+                        trainingPixelValue3 = averMin3;
                     }
                 }
                 cntTraining++;
             }
             else {
-                trainingPixelValue = trainingPixelValue + 10;
+                trainingPixelValue1 = trainingPixelValue1 + 10;
+                trainingPixelValue2 = trainingPixelValue2 + 10;
+                trainingPixelValue3 = trainingPixelValue3 + 10;
                 trainingFinished = true;
-                NSLog(@"training value: %d", trainingPixelValue);
+                NSLog(@"training value: %d; %d; %d;", trainingPixelValue1,trainingPixelValue2,trainingPixelValue3);
             }
         }
         else {
-            if (averMin > trainingPixelValue) {
+            int voteSFD=0;
+            if (averMin1 > trainingPixelValue1) {voteSFD++;}
+            if (averMin2 > trainingPixelValue2) {voteSFD++;}
+            if (averMin3 > trainingPixelValue3) {voteSFD++;}
+            if (voteSFD >= 2) {
                 thisFrame = SFD;
 //                NSLog(@"SFD");
                 startStateMachine = true;
@@ -536,7 +592,7 @@ typedef struct samplePixelArray {
                 case SFDJustBegin:
                     if (thisFrame == SFD) {
                         cntDataFrame = 0;
-                        NSLog(@"SFD2;%d", averMin);
+                        NSLog(@"SFD2: %d; %d; %d", averMin1, averMin2, averMin3);
                     }
                     else {
                         [self resetState];
@@ -581,7 +637,7 @@ typedef struct samplePixelArray {
                             else {
                                 NSLog(@"reset from error");
                             }
-                            NSLog(@"SFD1;%d", averMin);
+                            NSLog(@"SFD1: %d; %d; %d", averMin1, averMin2, averMin3);
                         }
                         else {
                             NSLog(@"error 3: data frame numbers is odd, can't demodulate");
@@ -598,12 +654,18 @@ typedef struct samplePixelArray {
             }
         }
 //        NSString *logStr = [[[NSString alloc] init] autorelease];
-//        NSString *sortStr = [[[NSString alloc] init] autorelease];
+//        NSString *sortStr1 = [[[NSString alloc] init] autorelease];
+//        NSString *sortStr2 = [[[NSString alloc] init] autorelease];
+//        NSString *sortStr3 = [[[NSString alloc] init] autorelease];
 //        for (int i=0; i<SamplePixelNumbers; i++) {
-//            logStr = [logStr stringByAppendingString:[NSString stringWithFormat:@"%d,",pixelArr.array[i]]];
-//            sortStr = [sortStr stringByAppendingString:[NSString stringWithFormat:@"%d,",sortArr[i]]];
+////            logStr = [logStr stringByAppendingString:[NSString stringWithFormat:@"%d,",pixelArr.array[i]]];
+//            sortStr1 = [sortStr1 stringByAppendingString:[NSString stringWithFormat:@"%d,",sortArr.array1[i]]];
+//            sortStr2 = [sortStr2 stringByAppendingString:[NSString stringWithFormat:@"%d,",sortArr.array2[i]]];
+//            sortStr3 = [sortStr3 stringByAppendingString:[NSString stringWithFormat:@"%d,",sortArr.array3[i]]];
 //        }
-//        NSLog(@"%@", sortStr);
+//        NSLog(@"%@", sortStr1);
+//        NSLog(@"%@", sortStr2);
+//        NSLog(@"%@", sortStr3);
 //        NSLog(@"%@", logStr);
     }
     
@@ -636,13 +698,13 @@ typedef struct samplePixelArray {
             int difference[SamplePixelNumbers];
             int cntDiff = 0;
             for (int j=0; j<SamplePixelNumbers; j++) {
-                difference[j] = abs(firstArr.array[j] - secondArr.array[j]);
+                difference[j] = abs(firstArr.array2[j] - secondArr.array2[j]);
                 if (difference[j] < 20) {
                     cntDiff++;
                 }
             }
 //            NSLog(@"same: %d", cntDiff);
-            if (cntDiff < 12) {
+            if (cntDiff < SamplePixelNumbers/2) {
 //                NSLog(@"%d",1);
                 data[(i-1)/2] = 1;
             }
@@ -652,11 +714,24 @@ typedef struct samplePixelArray {
             }
         }
     }
+    //from binary to decimal
+    int sum = 0;
+    for (int i=bitNum - 1; i>=0; i--) {
+        if (data[i] == 1) {
+            sum += pow(2, bitNum-i-1);
+        }
+    }
     NSString *dataStr = [[[NSString alloc] init] autorelease];
     for (int i=0; i<bitNum; i++) {
         dataStr = [dataStr stringByAppendingString:[NSString stringWithFormat:@"%d",data[i]]];
     }
-    NSLog(@"%@", dataStr);
+    NSString *dec_dataStr = [[[NSString alloc] initWithFormat:@"%d", sum] autorelease];
+    receivedData_dec = [dec_dataStr copy];
+    receivedData_bin = [dataStr copy];
+//    receivedData_dec = [NSString stringWithFormat:@"%d", sum];
+
+    NSLog(@"%@", receivedData_bin);
+    NSLog(@"%@",receivedData_dec);
     
 }
 
