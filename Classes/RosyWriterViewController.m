@@ -75,13 +75,13 @@ static inline double radians (double degrees) { return degrees * (M_PI / 180); }
 }
 - (IBAction)enableOrDisableTapFocus:(id)sender {
     if (shouldEnableTapFocus) {
-        [shouldEnableTapFocusBtn setTitle:@"unlock" forState:UIControlStateNormal];
+        [shouldEnableTapFocusBtn setTitle:@"stop" forState:UIControlStateNormal];
         shouldEnableTapFocus = false;
         //lock exposure后开始解调
         [videoProcessor startDemodulate];
     }
     else {
-        [shouldEnableTapFocusBtn setTitle:@"lock" forState:UIControlStateNormal];
+        [shouldEnableTapFocusBtn setTitle:@"start" forState:UIControlStateNormal];
         shouldEnableTapFocus = TRUE;
         //unlock后停止解调
         [videoProcessor stopDemodulate];
@@ -125,6 +125,7 @@ static inline double radians (double degrees) { return degrees * (M_PI / 180); }
 {
     showBinDataLabel.text = [videoProcessor receivedData_bin];
     showDecDataLabel.text = [videoProcessor receivedData_dec];
+    cntLabel.text = [NSString stringWithFormat:@"%d", [videoProcessor cntDecode]];
 }
 
 - (UILabel *)labelWithText:(NSString *)text yPosition:(CGFloat)yPosition
@@ -203,13 +204,13 @@ static inline double radians (double degrees) { return degrees * (M_PI / 180); }
     
     shouldEnableTapFocusBtn = [[[UIButton alloc] initWithFrame:CGRectMake(10, 10, 80, 60)] autorelease];
     [shouldEnableTapFocusBtn setBackgroundColor:[UIColor grayColor]];
-    [shouldEnableTapFocusBtn setTitle:@"lock" forState:UIControlStateNormal];
+    [shouldEnableTapFocusBtn setTitle:@"start" forState:UIControlStateNormal];
     [shouldEnableTapFocusBtn addTarget:self action:@selector(enableOrDisableTapFocus:) forControlEvents:UIControlEventTouchUpInside];
     
     [previewView addSubview:shouldEnableTapFocusBtn];
     
     showBinDataLabel = [[[UILabel alloc] initWithFrame:CGRectMake(10, 100, 500, 50)] autorelease];
-    [showBinDataLabel setTextColor:[UIColor whiteColor]];
+    [showBinDataLabel setTextColor:[UIColor blueColor]];
     [showBinDataLabel setBackgroundColor:[UIColor colorWithRed:0.0 green:0.0 blue:0.0 alpha:0.25]];
     [showBinDataLabel setFont:[UIFont systemFontOfSize:48]];
     [showBinDataLabel setText:@"88888888"];
@@ -225,6 +226,15 @@ static inline double radians (double degrees) { return degrees * (M_PI / 180); }
     showDecDataLabel.adjustsFontSizeToFitWidth = YES;
     
     [previewView addSubview:showDecDataLabel];
+    
+    cntLabel = [[[UILabel alloc] initWithFrame:CGRectMake(280, 160, 100, 50)] autorelease];
+    [cntLabel setTextColor:[UIColor greenColor]];
+    [cntLabel setBackgroundColor:[UIColor colorWithRed:0.0 green:0.0 blue:0.0 alpha:0.15]];
+    [cntLabel setFont:[UIFont systemFontOfSize:52]];
+    [cntLabel setText:@"0"];
+    cntLabel.adjustsFontSizeToFitWidth = YES;
+    
+    [previewView addSubview:cntLabel];
 }
 
 - (void)cleanup
@@ -238,6 +248,7 @@ static inline double radians (double degrees) { return degrees * (M_PI / 180); }
     shouldEnableTapFocusBtn = nil;
     showBinDataLabel = nil;
     showDecDataLabel = nil;
+    cntLabel = nil;
     
     NSNotificationCenter *notificationCenter = [NSNotificationCenter defaultCenter];
 	[notificationCenter removeObserver:self name:UIDeviceOrientationDidChangeNotification object:nil];

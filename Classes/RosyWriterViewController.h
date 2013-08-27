@@ -61,6 +61,7 @@
 	UILabel *typeLabel;
     UILabel *showBinDataLabel;
     UILabel *showDecDataLabel;
+    UILabel *cntLabel;
     
     UIButton *shouldEnableTapFocusBtn;
     BOOL shouldEnableTapFocus;

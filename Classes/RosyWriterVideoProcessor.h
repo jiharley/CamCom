@@ -97,8 +97,12 @@
     int trainingPixelValue3;
     bool trainingFinished;
     
+    int errorDataCnt;
+    int errorFrameCnt;
+    int totalFrames;
     NSString *receivedData_bin;
     NSString *receivedData_dec;
+    NSInteger cntDecode;
 	// Only accessed on movie writing queue
     BOOL readyToRecordAudio; 
     BOOL readyToRecordVideo;
@@ -115,6 +119,7 @@
 @property (readonly) CMVideoCodecType videoType;
 @property (readonly) NSString *receivedData_bin;
 @property (readonly) NSString *receivedData_dec;
+@property (readonly) NSInteger cntDecode;
 
 @property (readwrite) AVCaptureVideoOrientation referenceOrientation;
 

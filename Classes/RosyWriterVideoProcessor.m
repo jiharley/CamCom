@@ -104,7 +104,7 @@ typedef struct samplePixelArray {
 @synthesize referenceOrientation;
 @synthesize videoOrientation;
 @synthesize recording;
-@synthesize receivedData_bin, receivedData_dec;
+@synthesize receivedData_bin, receivedData_dec, cntDecode;
 
 - (id) init
 {
@@ -122,9 +122,11 @@ typedef struct samplePixelArray {
         trainingPixelValue2 = 0;
         trainingPixelValue3 = 0;
         trainingFinished = false;
+        
 //        demodulate_queue = dispatch_queue_create("demodulate_queue", nil);
         receivedData_bin = [[NSString alloc] initWithString:@"88888888"];
         receivedData_dec = [[NSString alloc] initWithString:@"88888888"];
+        cntDecode = 0;
         // The temporary path for the video before saving it to the photo album
         movieURL = [NSURL fileURLWithPath:[NSString stringWithFormat:@"%@%@", NSTemporaryDirectory(), @"Movie.MOV"]];
         [movieURL retain];
@@ -404,9 +406,15 @@ typedef struct samplePixelArray {
 
 - (void) startDemodulate {
     startingDemodulate = YES;
+    
+    totalFrames = 0;
+    errorDataCnt = 0;
+    errorFrameCnt = 0;
 }
 - (void) stopDemodulate {
     startingDemodulate = NO;
+    NSLog(@"Total frames:%d; Error frames:%d",totalFrames, errorFrameCnt);
+    NSLog(@"Total data:%d; Error data:%d", cntDecode, errorDataCnt);
 }
 #pragma mark Processing
 
@@ -483,7 +491,7 @@ typedef struct samplePixelArray {
             pixelArr.array3[sampleCnt] = thisPixel3[2];
             sampleCnt++;
         }
-        //ascend sort the sampled array
+        //sort the sampled array in ascending order
         SamplePixelArray sortArr;
         for (int i = 0; i<SamplePixelNumbers; i++) {
             sortArr.array1[i] = pixelArr.array1[i];
@@ -587,6 +595,7 @@ typedef struct samplePixelArray {
 //            thisFrame = DATA;
 //        }
         if (startStateMachine) {
+            totalFrames++;
             short state = 2*lastFrame + 1*thisFrame;
             switch (lastState) {
                 case SFDJustBegin:
@@ -674,6 +683,8 @@ typedef struct samplePixelArray {
 
 -(void) resetState
 {
+    errorFrameCnt++;
+    
     lastFrame = DATA;
     lastState = DataDidBegin;
     cntDataFrame = 0;
@@ -721,6 +732,9 @@ typedef struct samplePixelArray {
             sum += pow(2, bitNum-i-1);
         }
     }
+    if (sum != 555) {
+        errorDataCnt++;
+    }
     NSString *dataStr = [[[NSString alloc] init] autorelease];
     for (int i=0; i<bitNum; i++) {
         dataStr = [dataStr stringByAppendingString:[NSString stringWithFormat:@"%d",data[i]]];
@@ -728,6 +742,7 @@ typedef struct samplePixelArray {
     NSString *dec_dataStr = [[[NSString alloc] initWithFormat:@"%d", sum] autorelease];
     receivedData_dec = [dec_dataStr copy];
     receivedData_bin = [dataStr copy];
+    cntDecode = cntDecode + 1;
 //    receivedData_dec = [NSString stringWithFormat:@"%d", sum];
 
     NSLog(@"%@", receivedData_bin);
